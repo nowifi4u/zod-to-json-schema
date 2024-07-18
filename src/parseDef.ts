@@ -245,10 +245,10 @@ const addMeta = (
   jsonSchema: JsonSchema7Type,
 ): JsonSchema7Type => {
   if (def.description) {
-    jsonSchema.description = def.description;
+    [jsonSchema.title, jsonSchema.description] = def.description?.split('\0');
 
     if (refs.markdownDescription) {
-      jsonSchema.markdownDescription = def.description;
+      jsonSchema.markdownDescription = jsonSchema.description;
     }
   }
   return jsonSchema;
