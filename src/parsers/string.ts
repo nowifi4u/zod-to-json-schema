@@ -2,7 +2,7 @@ import { ZodStringDef } from "zod";
 import { ErrorMessages, setResponseValueAndErrors } from "../errorMessages.js";
 import { Refs } from "../Refs.js";
 
-let emojiRegex: RegExp | undefined;
+let emojiRegex: RegExp | undefined = undefined;
 
 /**
  * Generated from the regular expressions found here as of 2024-05-22:
@@ -35,7 +35,10 @@ export const zodPatterns = {
    */
   emoji: () => {
     if (emojiRegex === undefined) {
-      emojiRegex = RegExp("^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$", "u");
+      emojiRegex = RegExp(
+        "^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$",
+        "u",
+      );
     }
     return emojiRegex;
   },
@@ -47,12 +50,19 @@ export const zodPatterns = {
    * Unused
    */
   ipv4: /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/,
+  ipv4Cidr:
+    /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\/(3[0-2]|[12]?[0-9])$/,
   /**
    * Unused
    */
   ipv6: /^(([a-f0-9]{1,4}:){7}|::([a-f0-9]{1,4}:){0,6}|([a-f0-9]{1,4}:){1}:([a-f0-9]{1,4}:){0,5}|([a-f0-9]{1,4}:){2}:([a-f0-9]{1,4}:){0,4}|([a-f0-9]{1,4}:){3}:([a-f0-9]{1,4}:){0,3}|([a-f0-9]{1,4}:){4}:([a-f0-9]{1,4}:){0,2}|([a-f0-9]{1,4}:){5}:([a-f0-9]{1,4}:){0,1})([a-f0-9]{1,4}|(((25[0-5])|(2[0-4][0-9])|(1[0-9]{2})|([0-9]{1,2}))\.){3}((25[0-5])|(2[0-4][0-9])|(1[0-9]{2})|([0-9]{1,2})))$/,
+  ipv6Cidr:
+    /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$/,
   base64: /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/,
+  base64url:
+    /^([0-9a-zA-Z-_]{4})*(([0-9a-zA-Z-_]{2}(==)?)|([0-9a-zA-Z-_]{3}(=)?))?$/,
   nanoid: /^[a-zA-Z0-9_-]{21}$/,
+  jwt: /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]*$/,
 } as const;
 
 export type JsonSchema7StringType = {
@@ -90,12 +100,6 @@ export function parseStringDef(
   const res: JsonSchema7StringType = {
     type: "string",
   };
-
-  function processPattern(value: string): string {
-    return refs.patternStrategy === "escape"
-      ? escapeNonAlphaNumeric(value)
-      : value;
-  }
 
   if (def.checks) {
     for (const check of def.checks) {
@@ -155,7 +159,7 @@ export function parseStringDef(
         case "startsWith":
           addPattern(
             res,
-            RegExp(`^${processPattern(check.value)}`),
+            RegExp(`^${escapeLiteralCheckValue(check.value, refs)}`),
             check.message,
             refs,
           );
@@ -163,12 +167,11 @@ export function parseStringDef(
         case "endsWith":
           addPattern(
             res,
-            RegExp(`${processPattern(check.value)}$`),
+            RegExp(`${escapeLiteralCheckValue(check.value, refs)}$`),
             check.message,
             refs,
           );
           break;
-
         case "datetime":
           addFormat(res, "date-time", check.message, refs);
           break;
@@ -204,7 +207,7 @@ export function parseStringDef(
         case "includes": {
           addPattern(
             res,
-            RegExp(processPattern(check.value)),
+            RegExp(escapeLiteralCheckValue(check.value, refs)),
             check.message,
             refs,
           );
@@ -219,8 +222,23 @@ export function parseStringDef(
           }
           break;
         }
+        case "base64url":
+          addPattern(res, zodPatterns.base64url, check.message, refs);
+          break;
+        case "jwt":
+          addPattern(res, zodPatterns.jwt, check.message, refs);
+          break;
+        case "cidr": {
+          if (check.version !== "v6") {
+            addPattern(res, zodPatterns.ipv4Cidr, check.message, refs);
+          }
+          if (check.version !== "v4") {
+            addPattern(res, zodPatterns.ipv6Cidr, check.message, refs);
+          }
+          break;
+        }
         case "emoji":
-          addPattern(res, zodPatterns.emoji, check.message, refs);
+          addPattern(res, zodPatterns.emoji(), check.message, refs);
           break;
         case "ulid": {
           addPattern(res, zodPatterns.ulid, check.message, refs);
@@ -259,6 +277,7 @@ export function parseStringDef(
         case "trim":
           break;
         default:
+          /* c8 ignore next */
           ((_: never) => {})(check);
       }
     }
@@ -267,17 +286,37 @@ export function parseStringDef(
   return res;
 }
 
-const escapeNonAlphaNumeric = (value: string) =>
-  Array.from(value)
-    .map((c) => (/[a-zA-Z0-9]/.test(c) ? c : `\\${c}`))
-    .join("");
+function escapeLiteralCheckValue(literal: string, refs: Refs): string {
+  return refs.patternStrategy === "escape"
+    ? escapeNonAlphaNumeric(literal)
+    : literal;
+}
 
-const addFormat = (
+const ALPHA_NUMERIC = new Set(
+  "ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvxyz0123456789",
+);
+
+function escapeNonAlphaNumeric(source: string) {
+  let result = "";
+
+  for (let i = 0; i < source.length; i++) {
+    if (!ALPHA_NUMERIC.has(source[i])) {
+      result += "\\";
+    }
+
+    result += source[i];
+  }
+
+  return result;
+}
+
+// Adds a "format" keyword to the schema. If a format exists, both formats will be joined in an allOf-node, along with subsequent ones.
+function addFormat(
   schema: JsonSchema7StringType,
   value: Required<JsonSchema7StringType>["format"],
   message: string | undefined,
   refs: Refs,
-) => {
+) {
   if (schema.format || schema.anyOf?.some((x) => x.format)) {
     if (!schema.anyOf) {
       schema.anyOf = [];
@@ -308,14 +347,15 @@ const addFormat = (
   } else {
     setResponseValueAndErrors(schema, "format", value, message, refs);
   }
-};
+}
 
-const addPattern = (
+// Adds a "pattern" keyword to the schema. If a pattern exists, both patterns will be joined in an allOf-node, along with subsequent ones.
+function addPattern(
   schema: JsonSchema7StringType,
-  regex: RegExp | (() => RegExp),
+  regex: RegExp,
   message: string | undefined,
   refs: Refs,
-) => {
+) {
   if (schema.pattern || schema.allOf?.some((x) => x.pattern)) {
     if (!schema.allOf) {
       schema.allOf = [];
@@ -339,7 +379,7 @@ const addPattern = (
     }
 
     schema.allOf!.push({
-      pattern: processRegExp(regex, refs),
+      pattern: stringifyRegExpWithFlags(regex, refs),
       ...(message &&
         refs.errorMessages && { errorMessage: { pattern: message } }),
     });
@@ -347,17 +387,18 @@ const addPattern = (
     setResponseValueAndErrors(
       schema,
       "pattern",
-      processRegExp(regex, refs),
+      stringifyRegExpWithFlags(regex, refs),
       message,
       refs,
     );
   }
-};
+}
 
 // Mutate z.string.regex() in a best attempt to accommodate for regex flags when applyRegexFlags is true
-const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): string => {
-  const regex = typeof regexOrFunction === "function" ? regexOrFunction() : regexOrFunction;
-  if (!refs.applyRegexFlags || !regex.flags) return regex.source;
+function stringifyRegExpWithFlags(regex: RegExp, refs: Refs): string {
+  if (!refs.applyRegexFlags || !regex.flags) {
+    return regex.source;
+  }
 
   // Currently handled flags
   const flags = {
@@ -367,7 +408,6 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
   };
 
   // The general principle here is to step through each character, one at a time, applying mutations as flags require. We keep track when the current character is escaped, and when it's inside a group /like [this]/ or (also) a range like /[a-z]/. The following is fairly brittle imperative code; edit at your peril!
-
   const source = flags.i ? regex.source.toLowerCase() : regex.source;
   let pattern = "";
   let isEscaped = false;
@@ -428,7 +468,7 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
   }
 
   try {
-    const regexTest = new RegExp(pattern);
+    new RegExp(pattern);
   } catch {
     console.warn(
       `Could not convert regex pattern at ${refs.currentPath.join(
@@ -439,4 +479,4 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
   }
 
   return pattern;
-};
+}

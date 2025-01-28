@@ -88,7 +88,12 @@ export function parseDef(
   const seenItem = refs.seen.get(def);
 
   if (refs.override) {
-    const overrideResult = refs.override?.(def, refs, seenItem, forceResolution);
+    const overrideResult = refs.override?.(
+      def,
+      refs,
+      seenItem,
+      forceResolution,
+    );
 
     if (overrideResult !== ignoreOverride) {
       return overrideResult;
@@ -235,6 +240,7 @@ const selectParser = (
     case ZodFirstPartyTypeKind.ZodSymbol:
       return undefined;
     default:
+      /* c8 ignore next */
       return ((_: never) => undefined)(typeName);
   }
 };

@@ -9,6 +9,7 @@ import { Refs } from "../Refs.js";
 import { JsonSchema7EnumType } from "./enum.js";
 import { JsonSchema7ObjectType } from "./object.js";
 import { JsonSchema7StringType, parseStringDef } from "./string.js";
+import { parseBrandedDef } from "./branded.js";
 
 type JsonSchema7RecordPropertyNamesType =
   | Omit<JsonSchema7StringType, "type">
@@ -24,6 +25,12 @@ export function parseRecordDef(
   def: ZodRecordDef<ZodTypeAny, ZodTypeAny> | ZodMapDef,
   refs: Refs,
 ): JsonSchema7RecordType {
+  if (refs.target === "openAi") {
+    console.warn(
+      "Warning: OpenAI may not support records in schemas! Try an array of key-value pairs instead.",
+    );
+  }
+
   if (
     refs.target === "openApi3" &&
     def.keyType?._def.typeName === ZodFirstPartyTypeKind.ZodEnum
@@ -63,12 +70,7 @@ export function parseRecordDef(
     def.keyType?._def.typeName === ZodFirstPartyTypeKind.ZodString &&
     def.keyType._def.checks?.length
   ) {
-    const keyType: JsonSchema7RecordPropertyNamesType = Object.entries(
-      parseStringDef(def.keyType._def, refs),
-    ).reduce(
-      (acc, [key, value]) => (key === "type" ? acc : { ...acc, [key]: value }),
-      {},
-    );
+    const { type, ...keyType } = parseStringDef(def.keyType._def, refs);
 
     return {
       ...schema,
@@ -80,6 +82,20 @@ export function parseRecordDef(
       propertyNames: {
         enum: def.keyType._def.values,
       },
+    };
+  } else if (
+    def.keyType?._def.typeName === ZodFirstPartyTypeKind.ZodBranded &&
+    def.keyType._def.type._def.typeName === ZodFirstPartyTypeKind.ZodString &&
+    def.keyType._def.type._def.checks?.length
+  ) {
+    const { type, ...keyType } = parseBrandedDef(
+      def.keyType._def,
+      refs,
+    ) as JsonSchema7StringType;
+
+    return {
+      ...schema,
+      propertyNames: keyType,
     };
   }
 
