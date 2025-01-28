@@ -1,5 +1,5 @@
 {
-  "name": "zod-to-json-schema",
+  "name": "@nowifi4u/zod-to-json-schema",
   "version": "3.24.1",
   "description": "Converts Zod schemas to Json Schemas",
   "types": "./dist/types/index.d.ts",
